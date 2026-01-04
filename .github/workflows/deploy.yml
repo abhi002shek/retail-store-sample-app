@@ -104,8 +104,8 @@ jobs:
           echo "🔨 Building ${SERVICE}:${TAG}"
           
           # Create ECR repo if it doesn't exist
-          aws ecr describe-repositories --repository-names "retail-store-${SERVICE}" 2>/dev/null || \
-          aws ecr create-repository --repository-name "retail-store-${SERVICE}" \
+          aws ecr describe-repositories --repository-names "retail-store-${SERVICE}" --region ${{ env.AWS_REGION }} 2>/dev/null || \
+          aws ecr create-repository --repository-name "retail-store-${SERVICE}" --region ${{ env.AWS_REGION }} \
             --image-scanning-configuration scanOnPush=true \
             --encryption-configuration encryptionType=AES256
           
