@@ -24,6 +24,8 @@ The following environment variables are available for configuring the service:
 
 ## Endpoints
 
+This change is to trigger a github action
+
 Several "utility" endpoints are provided with useful functionality for various scenarios:
 
 | Method   | Name                     | Description                                                                        |
