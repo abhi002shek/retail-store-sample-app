@@ -66,4 +66,4 @@ To clean up:
 ```
 docker compose down
 ```
-This message is to trigger a action
+This message is to trigger a action# Trigger deployment for all services

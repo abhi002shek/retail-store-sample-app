@@ -82,3 +82,4 @@ To clean up:
 ```
 docker compose down
 ```
+# Trigger deployment for all services

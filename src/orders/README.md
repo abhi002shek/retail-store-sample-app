@@ -80,3 +80,4 @@ docker compose down
 ```
 
 ..
+# Trigger deployment for all services
