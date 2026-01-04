@@ -1,0 +1,84 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+    paths: ['src/**']
+
+env:
+  AWS_REGION: us-west-2
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      ui: ${{ steps.changes.outputs.ui }}
+      cart: ${{ steps.changes.outputs.cart }}
+      catalog: ${{ steps.changes.outputs.catalog }}
+      checkout: ${{ steps.changes.outputs.checkout }}
+      orders: ${{ steps.changes.outputs.orders }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            ui:
+              - 'src/ui/**'
+            cart:
+              - 'src/cart/**'
+            catalog:
+              - 'src/catalog/**'
+            checkout:
+              - 'src/checkout/**'
+            orders:
+              - 'src/orders/**'
+
+  build-and-push:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    if: ${{ needs.detect-changes.outputs.ui == 'true' || needs.detect-changes.outputs.cart == 'true' || needs.detect-changes.outputs.catalog == 'true' || needs.detect-changes.outputs.checkout == 'true' || needs.detect-changes.outputs.orders == 'true' }}
+    strategy:
+      matrix:
+        service: [ui, cart, catalog, checkout, orders]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        if: ${{ needs.detect-changes.outputs[matrix.service] == 'true' }}
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: retail-store-${{ matrix.service }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG src/${{ matrix.service }}
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Update values.yaml
+        if: ${{ needs.detect-changes.outputs[matrix.service] == 'true' }}
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          sed -i "s|repository:.*|repository: $ECR_REGISTRY/retail-store-${{ matrix.service }}|" src/${{ matrix.service }}/chart/values.yaml
+          sed -i "s|tag:.*|tag: \"$IMAGE_TAG\"|" src/${{ matrix.service }}/chart/values.yaml
+
+      - name: Commit and push changes
+        if: ${{ needs.detect-changes.outputs[matrix.service] == 'true' }}
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add src/${{ matrix.service }}/chart/values.yaml
+          git commit -m "Update ${{ matrix.service }} image to ${{ github.sha }}" || exit 0
+          git push
